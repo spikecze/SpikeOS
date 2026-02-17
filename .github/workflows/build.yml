@@ -1,32 +1,41 @@
-name: Build SpikeOS
+name: Build SpikeOS (32-bit on Arch)
 
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: archlinux/archlinux:latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install build-essential grub-pc-bin xorriso
+          sudo pacman -Syu --noconfirm
+          sudo pacman -S --noconfirm base-devel gcc-multilib grub xorriso nasm
 
-      - name: Build ISO
+      - name: Build kernel
         run: |
-          gcc -ffreestanding -m64 -c kernel.c -o kernel.o
-          ld -T linker.ld -o kernel.bin kernel.o
+          gcc -m32 -ffreestanding -c kernel.c -o kernel.o
+          gcc -m32 -ffreestanding -c boot.s -o boot.o
+          ld -m elf_i386 -T linker.ld -o kernel.bin boot.o kernel.o
+
+      - name: Create ISO structure
+        run: |
           mkdir -p iso/boot/grub
           cp kernel.bin iso/boot/kernel.bin
           cp grub/grub.cfg iso/boot/grub/grub.cfg
+
+      - name: Create ISO
+        run: |
           grub-mkrescue -o spikeos.iso iso
 
-      - name: Upload ISO
+      - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
-          name: spikeos
+          name: SpikeOS-ISO
           path: spikeos.iso
